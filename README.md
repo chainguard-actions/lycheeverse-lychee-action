@@ -1,6 +1,12 @@
 # lycheeverse/lychee-action
 
-Hardened GitHub Action by [Chainguard](https://www.chainguard.dev).
+Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/lycheeverse/lychee-action](https://github.com/lycheeverse/lychee-action).
+
+## Versions
+
+| Version | Tag | Upstream commit |
+|---------|-----|-----------------|
+| v2.8.0 | [`v2.8.0`](https://github.com/chainguard-actions/lychee-action/tree/v2.8.0) | — |
 
 ## Privacy
 
