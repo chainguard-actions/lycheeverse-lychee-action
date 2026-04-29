@@ -1,5 +1,7 @@
 # lycheeverse/lychee-action
 
+Github action to check for broken links in Markdown, HTML, and text files using lychee, a fast link checker written in Rust.
+
 Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/lycheeverse/lychee-action](https://github.com/lycheeverse/lychee-action).
 
 ## Versions
