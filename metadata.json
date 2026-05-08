@@ -2,5 +2,6 @@
   "owner": "lycheeverse",
   "name": "lychee-action",
   "visibility": "internal",
-  "description": "Github action to check for broken links in Markdown, HTML, and text files using lychee, a fast link checker written in Rust."
+  "description": "Github action to check for broken links in Markdown, HTML, and text files using lychee, a fast link checker written in Rust.",
+  "block_publish": false
 }
