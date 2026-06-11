@@ -23,10 +23,10 @@ if [ -n "${INPUT_TOKEN:-}" ]; then
 fi
 
 ARGS="${INPUT_ARGS}"
-FORMAT=""
+FORMAT_ARGS=()
 # Backwards compatibility:
 # If `format` occurs in args, ignore the value from `INPUT_FORMAT`
-[[ "$ARGS" =~ "--format " ]] || FORMAT="--format ${INPUT_FORMAT}"
+[[ "$ARGS" =~ "--format " ]] || FORMAT_ARGS=("--format" "${INPUT_FORMAT}")
 
 
 # If `output` occurs in args and `INPUT_OUTPUT` is set, exit with an error 
@@ -42,7 +42,7 @@ if [[ "$ARGS" =~ "--mode" ]] && [ -n "${INPUT_CHECKBOX:-}" ]; then
   exit 1
 fi
 
-CHECKBOX=""
+CHECKBOX_ARGS=()
 if [ "${INPUT_CHECKBOX}" = true ]; then
   # Warn if the version is lower than 0.18.1
   function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
@@ -50,12 +50,14 @@ if [ "${INPUT_CHECKBOX}" = true ]; then
   if version_lt "$lychee_version" "0.18.1"; then
     echo "WARNING: 'checkbox' is not supported in lychee versions lower than 0.18.1 (current is $lychee_version). Continuing without 'checkbox'."
   else
-    CHECKBOX="--mode task"
+    CHECKBOX_ARGS=("--mode" "task")
   fi
 fi
 
 # Execute lychee
-eval lychee ${CHECKBOX} ${FORMAT} --output ${LYCHEE_TMP} ${ARGS} 
+# Use read to split ARGS into an array to avoid eval and shell injection
+read -ra ARGS_ARRAY <<< "${ARGS}"
+lychee "${CHECKBOX_ARGS[@]}" "${FORMAT_ARGS[@]}" --output "${LYCHEE_TMP}" "${ARGS_ARRAY[@]}"
 LYCHEE_EXIT_CODE=$?
 
 # If no links were found and `failIfEmpty` is set to `true` (and it is by default),
