@@ -1,0 +1,45 @@
+name: Test cache
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+  repository_dispatch:
+
+permissions: {}
+
+jobs:
+  lychee-action:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    name: Test cache
+    permissions:
+      contents: read
+    steps:
+      - name: Restore lychee cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .lycheecache
+          key: cache-lychee-${{ github.sha }}
+          restore-keys: cache-lychee-
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Lychee URL checker
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2
+        with:
+          args: >-
+            --cache
+            --verbose
+            --no-progress
+            './**/*.md'
+            './**/*.html'
+            './**/*.rst'
+          # Fail the action on broken links.
+          # If the pipeline fails, the cache will _not_ be stored
+          fail: true
+        env:
+          # to be used in case rate limits are surpassed
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

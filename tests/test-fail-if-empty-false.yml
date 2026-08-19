@@ -1,0 +1,36 @@
+name: Test failIfEmpty false - no links found
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test markdown file with no links
+        run: |
+          mkdir -p tests/tmp
+          cat > tests/tmp/no-links.md << 'EOF'
+          # Test Document
+          This document has no links at all.
+          Just plain text content here.
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          args: "--verbose --no-progress 'tests/tmp/no-links.md'"
+          fail: "false"
+          failIfEmpty: "false"
+          output: "lychee/out-empty.md"
+
+      - name: Assert exit_code output is set
+        env:
+          EXIT_CODE: ${{ steps.action.outputs.exit_code }}
+        run: |
+          echo "exit_code: $EXIT_CODE"
+          if [ -z "$EXIT_CODE" ]; then
+            echo "FAIL: exit_code output was not set"
+            exit 1
+          fi
+          echo "PASS: exit_code is '$EXIT_CODE'"

@@ -1,0 +1,44 @@
+name: Test basic usage - valid links
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test markdown file with valid links
+        run: |
+          mkdir -p tests/tmp
+          cat > tests/tmp/test.md << 'EOF'
+          # Test Document
+          [Example](https://example.com)
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          args: "--verbose --no-progress 'tests/tmp/test.md'"
+          fail: "false"
+          failIfEmpty: "false"
+          output: "lychee/out.md"
+
+      - name: Assert exit_code output is set
+        env:
+          EXIT_CODE: ${{ steps.action.outputs.exit_code }}
+        run: |
+          echo "exit_code: $EXIT_CODE"
+          if [ -z "$EXIT_CODE" ]; then
+            echo "FAIL: exit_code output was not set"
+            exit 1
+          fi
+          echo "PASS: exit_code is '$EXIT_CODE'"
+
+      - name: Assert output file was created
+        run: |
+          if [ ! -f "lychee/out.md" ]; then
+            echo "FAIL: output file lychee/out.md was not created"
+            exit 1
+          fi
+          echo "PASS: output file exists"
+          cat lychee/out.md

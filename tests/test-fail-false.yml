@@ -1,0 +1,50 @@
+name: Test fail false - broken links do not fail pipeline
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test markdown file with a broken link
+        run: |
+          mkdir -p tests/tmp
+          cat > tests/tmp/broken-links.md << 'EOF'
+          # Test Document
+          [Broken Link](https://this-domain-does-not-exist-lychee-test-12345.invalid)
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          args: "--verbose --no-progress 'tests/tmp/broken-links.md'"
+          fail: "false"
+          failIfEmpty: "false"
+          output: "lychee/out-broken.md"
+
+      - name: Assert action succeeded despite broken links (fail=false)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          EXIT_CODE: ${{ steps.action.outputs.exit_code }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "exit_code: $EXIT_CODE"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed when fail=false, but got '$OUTCOME'"
+            exit 1
+          fi
+          if [ -z "$EXIT_CODE" ]; then
+            echo "FAIL: exit_code output was not set"
+            exit 1
+          fi
+          echo "PASS: action succeeded with fail=false, exit_code=$EXIT_CODE"
+
+      - name: Assert output file was created
+        run: |
+          if [ ! -f "lychee/out-broken.md" ]; then
+            echo "FAIL: output file lychee/out-broken.md was not created"
+            exit 1
+          fi
+          echo "PASS: output file exists"
+          cat lychee/out-broken.md

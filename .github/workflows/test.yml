@@ -1,0 +1,333 @@
+name: Test lychee-action
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+  repository_dispatch:
+
+permissions: {}
+
+env:
+  CUSTOM_OUTPUT_RELATIVE_PATH: lychee/custom_output.md
+  CUSTOM_OUTPUT_ABSOLUTE_PATH: /tmp/report.md
+  CUSTOM_OUTPUT_DUMP_PATH: /tmp/dump.md
+
+jobs:
+  lychee-action:
+    runs-on: ubuntu-latest
+    name: Test the lychee link checker action
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: test defaults
+        uses: ./
+
+      - name: test explicit lychee version
+        uses: ./
+        with:
+          checkbox: false # not supported in v0.15.1
+          lycheeVersion: v0.15.1
+
+      - name: test nightly lychee version
+        uses: ./
+        with:
+          lycheeVersion: nightly
+
+      - name: test latest lychee version
+        uses: ./
+        with:
+          lycheeVersion: latest
+
+      - name: test globs
+        uses: ./
+        with:
+          args: >-
+            --verbose
+            --no-progress
+            './**/*.md'
+            './**/*.html'
+            './**/*.rst'
+
+      - name: test --root-dir argument
+        uses: ./
+        with:
+          args: >-
+            --root-dir "$(pwd)"
+            --verbose
+            --no-progress
+            './**/*.md'
+            './**/*.html'
+            './**/*.rst'
+
+      - name: test working directory functionality
+        uses: ./
+        with:
+          workingDirectory: fixtures/subdir
+          args: --dump-inputs '*'
+          output: ${{ github.workspace }}/working_dir_inputs.txt
+
+      - name: test working directory output
+        env:
+          GITHUB_WORKSPACE_PATH: ${{ github.workspace }}
+        run: |
+          line_count=$(wc -l < "$GITHUB_WORKSPACE_PATH/working_dir_inputs.txt")
+          if ! grep -q "test-working-dir.md" "$GITHUB_WORKSPACE_PATH/working_dir_inputs.txt" || [ "$line_count" -ne 2 ]; then
+            echo "Working directory test failed. Output:"
+            cat "$GITHUB_WORKSPACE_PATH/working_dir_inputs.txt"
+            exit 1
+          fi
+
+      - name: test custom output relative path - creation
+        uses: ./
+        with:
+          output: "${{ env.CUSTOM_OUTPUT_RELATIVE_PATH }}"
+          debug: true
+
+      - name: test custom output relative path - validation
+        env:
+          CUSTOM_OUTPUT_RELATIVE_PATH: ${{ env.CUSTOM_OUTPUT_RELATIVE_PATH }}
+        run: |
+          echo "Checking custom output file at $CUSTOM_OUTPUT_RELATIVE_PATH"
+          if [ ! -f "$CUSTOM_OUTPUT_RELATIVE_PATH" ]; then
+            echo "Not found"
+            exit 1
+          else
+            echo "Found. Contents:"
+            cat "$CUSTOM_OUTPUT_RELATIVE_PATH"
+          fi
+
+      - name: test custom output absolute path - creation
+        uses: ./
+        with:
+          output: "${{ env.CUSTOM_OUTPUT_ABSOLUTE_PATH }}"
+          debug: true
+
+      - name: test custom output absolute path - validation
+        env:
+          CUSTOM_OUTPUT_ABSOLUTE_PATH: ${{ env.CUSTOM_OUTPUT_ABSOLUTE_PATH }}
+        run: |
+          echo "Checking custom output file at $CUSTOM_OUTPUT_ABSOLUTE_PATH"
+          if [ ! -f "$CUSTOM_OUTPUT_ABSOLUTE_PATH" ]; then
+            echo "Not found"
+            exit 1
+          else
+            echo "Found. Contents:"
+            cat "$CUSTOM_OUTPUT_ABSOLUTE_PATH"
+          fi
+
+      - name: test dump with custom output path - creation
+        uses: ./
+        with:
+          args: --dump './**/*.md' './**/*.html' './**/*.rst'
+          output: "${{ env.CUSTOM_OUTPUT_DUMP_PATH }}"
+          debug: true
+
+      - name: test dump with custom output path - validation
+        env:
+          CUSTOM_OUTPUT_DUMP_PATH: ${{ env.CUSTOM_OUTPUT_DUMP_PATH }}
+        run: |
+          echo "Checking dump output file at $CUSTOM_OUTPUT_DUMP_PATH"
+          if [ ! -f "$CUSTOM_OUTPUT_DUMP_PATH" ]; then
+            echo "Not found"
+            exit 1
+          else
+            echo "Found. Contents:"
+            cat "$CUSTOM_OUTPUT_DUMP_PATH"
+          fi
+
+      - name: test output set in args and action input
+        id: output_set_in_args_and_action_input
+        uses: ./
+        with:
+          args: --output foo -
+          output: bar
+        continue-on-error: true
+
+      - name: test output set in args and action input should fail - validation
+        if: steps.output_set_in_args_and_action_input.outcome != 'failure'
+        run: |
+          echo "Output set in args and action input should have failed."
+          exit 1
+
+      - name: test fail - a lychee error should fail the pipeline
+        id: fail_test
+        uses: ./
+        with:
+          args: --verbose --no-progress foo.bar
+          debug: true
+        continue-on-error: true
+
+      # Explicitly check the exit code of the previous step
+      # as it's expected to fail
+      - name: Check fail
+        if: steps.fail_test.outcome != 'failure'
+        run: |
+          echo "Fail should have failed because the URL is invalid."
+          exit 1
+
+      - name: test disable fail - it's okay if lychee throws an error
+        uses: ./
+        with:
+          args: --no-progress foo.bar
+          fail: false
+
+      - name: test failIfEmpty - no links in input should fail the pipeline
+        id: fail_if_empty_test
+        uses: ./
+        with:
+          args: --verbose --no-progress fixtures/empty.md
+          debug: true
+        continue-on-error: true
+
+      # Explicitly check the exit code of the previous step
+      # as it's expected to fail
+      - name: Check failIfEmpty
+        if: steps.fail_if_empty_test.outcome != 'failure'
+        run: |
+          echo "FailIfEmpty should have failed because no links were found."
+          exit 1
+
+      - name: test disable failIfEmpty - it's okay if no links are found
+        uses: ./
+        with:
+          args: --no-progress fixtures/empty.md
+          failIfEmpty: false
+
+      - name: test disable failIfEmpty - a lychee error should still fail the pipeline
+        id: fail_but_not_failIfEmpty_test
+        uses: ./
+        with:
+          args: --verbose --no-progress foo.bar
+          failIfEmpty: false
+          debug: true
+        continue-on-error: true
+
+      # Explicitly check the exit code of the previous step
+      # as it's expected to fail
+      - name: Check fail when failIfEmpty is disabled
+        if: steps.fail_but_not_failIfEmpty_test.outcome != 'failure'
+        run: |
+          echo "Fail should have failed because the URL is invalid, even though failIfEmpty is disabled."
+          exit 1
+
+      - name: test disable fail - no links in input should still fail the pipeline
+        id: failIfEmpty_but_not_fail_test
+        uses: ./
+        with:
+          args: --verbose --no-progress fixtures/empty.md
+          fail: false
+          debug: true
+        continue-on-error: true
+
+      # Explicitly check the exit code of the previous step
+      # as it's expected to fail
+      - name: Check failIfEmpty when fail is disabled
+        if: steps.failIfEmpty_but_not_fail_test.outcome != 'failure'
+        run: |
+          echo "FailIfEmpty should have failed because no links were found, even though fail is disabled."
+          exit 1
+
+      - name: Install jq
+        run: sudo apt-get install jq
+
+      - name: test workflow inputs - Markdown
+        uses: ./
+        with:
+          args: -v fixtures/TEST.md
+          format: json
+          output: ${{ github.workspace }}/foo_md.json
+
+      - name: Validate JSON - Markdown
+        env:
+          GITHUB_WORKSPACE_PATH: ${{ github.workspace }}
+        run: |
+          if ! jq empty "$GITHUB_WORKSPACE_PATH/foo_md.json"; then
+            echo "Output file does not exist or is not valid JSON"
+            exit 1
+          fi
+
+      - name: test workflow inputs - rST
+        uses: ./
+        with:
+          args: -v fixtures/TEST.rst
+          format: json
+          output: ${{ github.workspace }}/foo_rst.json
+
+      - name: Validate JSON - rST
+        env:
+          GITHUB_WORKSPACE_PATH: ${{ github.workspace }}
+        run: |
+          if ! jq empty "$GITHUB_WORKSPACE_PATH/foo_rst.json"; then
+            echo "Output file does not exist or is not valid JSON"
+            exit 1
+          fi
+
+      - name: directory
+        uses: ./
+        with:
+          args: .
+
+      - name: test format override
+        uses: ./
+        with:
+          args: --format markdown -v fixtures/TEST.md
+          format: doesnotexist # gets ignored if format set in args
+          output: ${{ github.workspace }}/foo.txt
+
+      - name: test debug
+        uses: ./
+        with:
+          debug: true
+
+      - name: test custom GitHub token
+        uses: ./
+        with:
+          token: ${{ secrets.CUSTOM_TOKEN }}
+
+      - name: Test exit code set in steps-output
+        id: lychee_exit_code_test
+        uses: ./
+        with:
+          args: -- inputdoesnotexist
+        continue-on-error: true
+
+      - name: Check exit code in steps.outputs
+        env:
+          LYCHEE_EXIT_CODE: ${{ steps.lychee_exit_code_test.outputs.exit_code }}
+        run: |
+          echo "Lychee exit code: $LYCHEE_EXIT_CODE"
+          if [[ "$LYCHEE_EXIT_CODE" == "1" ]]; then
+            echo "Lychee correctly failed with exit code 1"
+          else
+            echo "Unexpected exit code: $LYCHEE_EXIT_CODE"
+            echo "Expected exit code 1"
+            exit 1
+          fi
+  lychee-action-arm:
+    runs-on: ubuntu-24.04-arm
+    name: Basic check for ARM-based runners
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: test defaults
+        uses: ./
+
+      - name: test explicit lychee version
+        uses: ./
+        with:
+          checkbox: false # not supported in v0.15.1
+          lycheeVersion: v0.15.1
+
+      - name: test nightly lychee version
+        uses: ./
+        with:
+          lycheeVersion: nightly
