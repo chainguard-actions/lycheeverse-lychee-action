@@ -1,0 +1,54 @@
+name: Test JSON output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a markdown file with valid links
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/test-content"
+          cat > "$GITHUB_WORKSPACE/test-content/links.md" << 'EOF'
+          # Test Links
+
+          - [GitHub](https://github.com)
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          args: "--verbose --no-progress './test-content/**/*.md'"
+          fail: "false"
+          failIfEmpty: "false"
+          format: "json"
+          output: "lychee/out.json"
+          jobSummary: "false"
+          lycheeVersion: "v0.23.0"
+
+      - name: Assert exit_code output is set
+        env:
+          EXIT_CODE: ${{ steps.action.outputs.exit_code }}
+        run: |
+          echo "exit_code: $EXIT_CODE"
+          if [ -z "$EXIT_CODE" ]; then
+            echo "FAIL: exit_code output was not set"
+            exit 1
+          fi
+          echo "PASS: exit_code is '$EXIT_CODE'"
+
+      - name: Assert JSON output file was created and is valid JSON
+        run: |
+          if [ ! -f "lychee/out.json" ]; then
+            echo "FAIL: output file lychee/out.json was not created"
+            exit 1
+          fi
+          echo "PASS: output file exists"
+          cat lychee/out.json
+          # Validate it's valid JSON
+          if ! python3 -c "import sys, json; json.load(open('lychee/out.json'))" 2>/dev/null; then
+            echo "FAIL: output file is not valid JSON"
+            exit 1
+          fi
+          echo "PASS: output file is valid JSON"

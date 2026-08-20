@@ -1,0 +1,32 @@
+name: Links
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+  schedule:
+    - cron: "00 18 * * *"
+
+jobs:
+  linkChecker:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write # required for peter-evans/create-issue-from-file
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Link Checker
+        id: lychee
+        uses: ./ # Uses an action in the root directory
+        with:
+          args: --user-agent "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:59.0) Gecko/20100101 Firefox/59.0" --verbose --exclude spinroot.com --no-progress './**/*.md' './**/*.html' './**/*.rst'
+          fail: true
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Create Issue From File
+        if: steps.lychee.outputs.exit_code != 0
+        uses: peter-evans/create-issue-from-file@fca9117c27cdc29c6c4db3b86c48e4115a786710 # v6
+        with:
+          title: Link Checker Report
+          content-filepath: ./lychee/out.md
+          labels: report, automated issue

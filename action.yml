@@ -116,16 +116,16 @@ runs:
       shell: bash
     - name: Install lychee
       env:
-        LYCHEE_TEMP_DIR: ${{ steps.lychee-setup.outputs.temp_dir }}
+        TEMP_DIR: ${{ steps.lychee-setup.outputs.temp_dir }}
       run: |
         # Install lychee from the temporary directory
-        install -t "$HOME/.local/bin" -D "$LYCHEE_TEMP_DIR/lychee"
+        install -t "$HOME/.local/bin" -D "${TEMP_DIR}/lychee"
       shell: bash
     - name: Run Lychee
       id: run-lychee
       working-directory: ${{ inputs.workingDirectory }}
-      run: "$GITHUB_ACTION_PATH/entrypoint.sh"
       env:
+        ACTION_PATH: ${{ github.action_path }}
         # https://github.com/actions/runner/issues/665
         INPUT_TOKEN: ${{ inputs.TOKEN }}
         INPUT_ARGS: ${{ inputs.ARGS }}
@@ -137,6 +137,7 @@ runs:
         INPUT_CHECKBOX: ${{ inputs.CHECKBOX }}
         INPUT_OUTPUT: ${{ inputs.OUTPUT }}
         SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#summary-${{ job.check_run_id }}
+      run: "${ACTION_PATH}/entrypoint.sh"
       shell: bash
 branding:
   icon: "external-link"

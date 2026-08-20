@@ -1,0 +1,53 @@
+name: Test custom working directory
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a subdirectory with markdown files
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/subdir/docs"
+          cat > "$GITHUB_WORKSPACE/subdir/docs/readme.md" << 'EOF'
+          # Documentation
+
+          - [GitHub](https://github.com)
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          args: "--verbose --no-progress './**/*.md'"
+          fail: "false"
+          failIfEmpty: "false"
+          output: "lychee/out.md"
+          workingDirectory: "subdir"
+          lycheeVersion: "v0.23.0"
+
+      - name: Assert exit_code output is set
+        env:
+          EXIT_CODE: ${{ steps.action.outputs.exit_code }}
+        run: |
+          echo "exit_code: $EXIT_CODE"
+          if [ -z "$EXIT_CODE" ]; then
+            echo "FAIL: exit_code output was not set"
+            exit 1
+          fi
+          echo "PASS: exit_code is '$EXIT_CODE'"
+
+      - name: Assert output file was created
+        run: |
+          # Output path is relative to workingDirectory
+          if [ ! -f "$GITHUB_WORKSPACE/subdir/lychee/out.md" ]; then
+            echo "FAIL: output file subdir/lychee/out.md was not created"
+            # Check if it was created in the workspace root instead
+            if [ -f "lychee/out.md" ]; then
+              echo "INFO: found at workspace root lychee/out.md instead"
+              cat lychee/out.md
+            fi
+            exit 1
+          fi
+          echo "PASS: output file exists in working directory"
+          cat "$GITHUB_WORKSPACE/subdir/lychee/out.md"

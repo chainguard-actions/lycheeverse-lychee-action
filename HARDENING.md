@@ -8,45 +8,91 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **lycheeverse--lychee-action/v2.8.0** was hardened automatically. 2 finding(s) were identified and resolved across 2 iteration(s).
+Action **lycheeverse--lychee-action/v2.8.0** was hardened automatically. 3 finding(s) were identified and resolved across 2 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Sub-rule (a): A ${{ steps.lychee-setup.outputs.temp_dir }} expression (steps.*.outputs.* context) is directly interpolated inside a run: shell command string in the 'Install lychee' step. Before the shell executes, GitHub Actions performs YAML template substitution, so any attacker-controlled value in that output could inject shell metacharacters. The offending line is: install -t "$HOME/.local/bin" -D "${{ steps.lychee-setup.outputs.temp_dir }}/lychee". The fix is to pass the value via an env: variable and reference it as a quoted shell variable.
+Sub-rule (a): Direct ${{ ... }} expression interpolation inside run: blocks. In action.yml, the 'Install lychee' step interpolates ${{ steps.lychee-setup.outputs.temp_dir }} directly in the shell command string, and the 'Run Lychee' step uses ${{ github.action_path }} as the run: value itself. In lychee-version.yml, the 'compare-versions' step interpolates ${{ steps.get-action-lychee-version.outputs.result }} and ${{ steps.get-lychee-release.outputs.release_version }} directly inside a run: block. In test.yml, multiple run: blocks interpolate ${{ github.workspace }}, ${{ env.CUSTOM_OUTPUT_RELATIVE_PATH }}, ${{ env.CUSTOM_OUTPUT_ABSOLUTE_PATH }}, ${{ env.CUSTOM_OUTPUT_DUMP_PATH }}, and ${{ steps.lychee_exit_code_test.outputs.exit_code }} directly in shell command strings.
 
 Locations:
 
-- `action.yml:104`
+- `action.yml:108`
+- `action.yml:113`
+- `.github/workflows/lychee-version.yml:48`
+- `.github/workflows/lychee-version.yml:49`
+- `.github/workflows/test.yml:47`
+- `.github/workflows/test.yml:57`
+- `.github/workflows/test.yml:68`
+- `.github/workflows/test.yml:79`
+- `.github/workflows/test.yml:155`
+- `.github/workflows/test.yml:168`
+- `.github/workflows/test.yml:179`
+- `.github/workflows/test.yml:190`
+- `.github/workflows/test.yml:218`
+- `.github/workflows/test.yml:226`
+- `.github/workflows/test.yml:234`
+- `.github/workflows/test.yml:265`
+- `.github/workflows/test.yml:270`
+- `.github/workflows/test.yml:275`
 
-### script-injection (severity: high)
+### unpinned-uses (severity: high)
 
-Sub-rule (a): A ${{ github.action_path }} expression (github.* context) is directly interpolated as the entire run: command in the 'Run Lychee' step. The offending line is: run: ${{ github.action_path }}/entrypoint.sh. Even though github.action_path is typically GitHub-controlled, any ${{ ... }} expression inside a run: block undergoes YAML template substitution before shell quoting, making it a script-injection risk. The fix is to use the $GITHUB_ACTION_PATH environment variable instead.
+All uses: references across workflow files and action.yml use mutable tags or branch names instead of pinned 40-character SHA commit hashes. Failing references include: actions/checkout@v6, ahmadnassri/action-dependabot-auto-merge@v2.6.6, peter-evans/create-issue-from-file@v6, mikefarah/yq@master, peter-evans/create-pull-request@v8, actions/cache@v5, lycheeverse/lychee-action@v2, Actions-R-Us/actions-tagger@v2.
 
 Locations:
 
-- `action.yml:109`
+- `.github/workflows/auto-merge.yml:10`
+- `.github/workflows/auto-merge.yml:11`
+- `.github/workflows/links.yml:14`
+- `.github/workflows/links.yml:22`
+- `.github/workflows/lychee-version.yml:20`
+- `.github/workflows/lychee-version.yml:30`
+- `.github/workflows/lychee-version.yml:55`
+- `.github/workflows/lychee-version.yml:63`
+- `.github/workflows/lychee-version.yml:67`
+- `.github/workflows/test.yml:18`
+- `.github/workflows/test.yml:246`
+- `.github/workflows/test_cache.yml:16`
+- `.github/workflows/test_cache.yml:19`
+- `.github/workflows/test_cache.yml:22`
+- `.github/workflows/versioning.yml:11`
+
+### missing-permissions (severity: medium)
+
+The following workflow files have no top-level permissions: block and no job-level permissions: blocks on any job, meaning they run with the default (potentially broad) token permissions: auto-merge.yml, test.yml, test_cache.yml, versioning.yml.
+
+Locations:
+
+- `.github/workflows/auto-merge.yml:1`
+- `.github/workflows/test.yml:1`
+- `.github/workflows/test_cache.yml:1`
+- `.github/workflows/versioning.yml:1`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection
+**Fixes applied:** script-injection, unpinned-uses, missing-permissions
 
 **Notes:**
 
-Fixed two script-injection findings in action.yml:
-1. 'Install lychee' step (line 104): Moved `${{ steps.lychee-setup.outputs.temp_dir }}` into an `env:` block as `LYCHEE_TEMP_DIR` and referenced it as `$LYCHEE_TEMP_DIR` in the shell command.
-2. 'Run Lychee' step (line 109): Replaced `run: ${{ github.action_path }}/entrypoint.sh` with `run: "$GITHUB_ACTION_PATH/entrypoint.sh"`, using the built-in environment variable instead of YAML template substitution.
+Fixed all three findings across action.yml and .github/workflows/*.yml files:
+
+1. script-injection: Moved all ${{ }} expressions out of run: blocks into step-level env: blocks in action.yml (Install lychee step uses TEMP_DIR env var, Run Lychee step uses ACTION_PATH env var), lychee-version.yml (compare-versions step uses ACTION_LYCHEE_VERSION and RELEASE_VERSION env vars), and test.yml (github.workspace, env.CUSTOM_OUTPUT_* paths, and steps.lychee_exit_code_test.outputs.exit_code all moved to env: blocks).
+
+2. unpinned-uses: Pinned all 8 action references to full 40-character SHA hashes with tag comments: actions/checkout@v6→d23441a4, ahmadnassri/action-dependabot-auto-merge@v2.6.6→45fc124d, peter-evans/create-issue-from-file@v6→fca9117c, mikefarah/yq@master→ce7026e3, peter-evans/create-pull-request@v8→5f6978fa, actions/cache@v5→caa29612, lycheeverse/lychee-action@v2→e7477775, Actions-R-Us/actions-tagger@v2→330ddfac.
+
+3. missing-permissions: Added top-level permissions: {} and appropriate minimal job-level permissions to auto-merge.yml (contents: write, pull-requests: write), test.yml (contents: read), test_cache.yml (contents: read), and versioning.yml (contents: write).
 
 ### Iteration 2
 
-**Fixes applied:** script-injection
+**Fixes applied:** script-injection, missing-permissions
 
 **Notes:**
 
-Fixed the script injection vulnerability in entrypoint.sh by replacing the dangerous `eval lychee ${CHECKBOX} ${FORMAT} --output ${LYCHEE_TMP} ${ARGS}` call with a safe direct invocation using bash arrays. Changes: (1) `FORMAT` string replaced with `FORMAT_ARGS` array `("--format" "${INPUT_FORMAT}")` so INPUT_FORMAT is always a single literal argument; (2) `CHECKBOX` string replaced with `CHECKBOX_ARGS` array `("--mode" "task")`; (3) `ARGS` is split into `ARGS_ARRAY` via `read -ra` (word-splitting on whitespace only, not shell metacharacters); (4) `eval` replaced with direct `lychee "${CHECKBOX_ARGS[@]}" "${FORMAT_ARGS[@]}" --output "${LYCHEE_TMP}" "${ARGS_ARRAY[@]}"`. Shell metacharacters like `;`, `|`, `$(...)`, and backticks in user-supplied inputs are now passed as literal arguments to lychee rather than being interpreted by the shell.
+1. entrypoint.sh: Replaced `eval lychee ${CHECKBOX} ${FORMAT} --output ${LYCHEE_TMP} ${ARGS}` with a safe array-based invocation. CHECKBOX and FORMAT (single values) are tokenized via xargs into a lychee_args array with empty-value guards. LYCHEE_TMP is double-quoted as a path. ARGS (a list of user-controlled arguments) is tokenized via xargs with the NUL-delimited read loop pattern and an empty-value guard. eval is completely eliminated. 2. .github/workflows/lychee-version.yml: Added `permissions: contents: read` to the `check-lychee-version` job to restrict it to the minimum required permissions (read-only repository access for checkout).
 
