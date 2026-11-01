@@ -6,10 +6,10 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 ## Versions
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v2.8.0 | [`v2.8.0`](https://github.com/chainguard-actions/lycheeverse-lychee-action/tree/v2.8.0) | [`8646ba3`](https://github.com/lycheeverse/lychee-action/commit/8646ba30535128ac92d33dfc9133794bfdd9b411) |
-| v2.9.0 | [`v2.9.0`](https://github.com/chainguard-actions/lycheeverse-lychee-action/tree/v2.9.0) | [`e747777`](https://github.com/lycheeverse/lychee-action/commit/e7477775783ea5526144ba13e8db5eec57747ce8) |
+| Version | Tag | Upstream commit | Hardening report |
+|---------|-----|-----------------|------------------|
+| v2.8.0 | [`v2.8.0`](https://github.com/chainguard-actions/lycheeverse-lychee-action/tree/v2.8.0) | [`8646ba3`](https://github.com/lycheeverse/lychee-action/commit/8646ba30535128ac92d33dfc9133794bfdd9b411) | [`HARDENING.md`](https://github.com/chainguard-actions/lycheeverse-lychee-action/blob/v2.8.0/HARDENING.md) |
+| v2.9.0 | [`v2.9.0`](https://github.com/chainguard-actions/lycheeverse-lychee-action/tree/v2.9.0) | [`e747777`](https://github.com/lycheeverse/lychee-action/commit/e7477775783ea5526144ba13e8db5eec57747ce8) | [`HARDENING.md`](https://github.com/chainguard-actions/lycheeverse-lychee-action/blob/v2.9.0/HARDENING.md) |
 
 ## Privacy
 
