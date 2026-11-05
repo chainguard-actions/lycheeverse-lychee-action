@@ -71,7 +71,7 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - name: Set up environment
       run: |
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        printf '%s\n' "$(printf '%s' "$HOME/.local/bin" | tr -d '\n\r')" >> "$GITHUB_PATH"
         mkdir -p "$HOME/.local/bin"
       shell: bash
     - name: Clean up existing lychee binary
@@ -110,22 +110,24 @@ runs:
         tar -xvzf "${FILENAME}"
 
         # Output temp directory for use in later steps
-        echo "temp_dir=${TEMP_DIR}" >> $GITHUB_OUTPUT
+        safe_temp_dir=$(printf '%s' "${TEMP_DIR}" | tr -d '\n\r')
+        echo "temp_dir=${safe_temp_dir}" >> "$GITHUB_OUTPUT"
       env:
         LYCHEE_VERSION: ${{ inputs.lycheeVersion }}
       shell: bash
     - name: Install lychee
-      env:
-        TEMP_DIR: ${{ steps.lychee-setup.outputs.temp_dir }}
       run: |
         # Install lychee from the temporary directory
-        install -t "$HOME/.local/bin" -D "${TEMP_DIR}/lychee"
+        install -t "$HOME/.local/bin" -D "$TEMP_DIR/lychee"
+      env:
+        TEMP_DIR: ${{ steps.lychee-setup.outputs.temp_dir }}
       shell: bash
     - name: Run Lychee
       id: run-lychee
       working-directory: ${{ inputs.workingDirectory }}
+      run: |
+        "$GITHUB_ACTION_PATH/entrypoint.sh"
       env:
-        ACTION_PATH: ${{ github.action_path }}
         # https://github.com/actions/runner/issues/665
         INPUT_TOKEN: ${{ inputs.TOKEN }}
         INPUT_ARGS: ${{ inputs.ARGS }}
@@ -137,7 +139,6 @@ runs:
         INPUT_CHECKBOX: ${{ inputs.CHECKBOX }}
         INPUT_OUTPUT: ${{ inputs.OUTPUT }}
         SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#summary-${{ job.check_run_id }}
-      run: "${ACTION_PATH}/entrypoint.sh"
       shell: bash
 branding:
   icon: "external-link"

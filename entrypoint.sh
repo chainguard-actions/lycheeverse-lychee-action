@@ -57,17 +57,20 @@ fi
 # Execute lychee
 lychee_args=()
 if [ -n "${CHECKBOX}" ]; then
-  while IFS= read -r -d '' t; do lychee_args+=("$t"); done \
-    < <(printf '%s' "${CHECKBOX}" | xargs printf '%s\0')
+  lychee_args+=(--mode task)
 fi
 if [ -n "${FORMAT}" ]; then
-  while IFS= read -r -d '' t; do lychee_args+=("$t"); done \
-    < <(printf '%s' "${FORMAT}" | xargs printf '%s\0')
+  lychee_args+=(--format "${INPUT_FORMAT}")
 fi
 lychee_args+=(--output "${LYCHEE_TMP}")
 if [ -n "${ARGS}" ]; then
+  # Quote-aware split (as eval did), without evaluating shell code
+  if ! printf '%s' "${ARGS}" | xargs -r true; then
+    echo "Error: could not parse 'args' (unmatched quote?)."
+    exit 1
+  fi
   while IFS= read -r -d '' t; do lychee_args+=("$t"); done \
-    < <(printf '%s' "${ARGS}" | xargs printf '%s\0')
+    < <(printf '%s' "${ARGS}" | xargs -r printf '%s\0')
 fi
 lychee "${lychee_args[@]}"
 LYCHEE_EXIT_CODE=$?
