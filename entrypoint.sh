@@ -54,16 +54,20 @@ if [ "${INPUT_CHECKBOX}" = true ]; then
   fi
 fi
 
-# Tokenize ARGS (a whitespace-separated list of arguments) into an array,
-# honoring quotes and backslashes the same way the shell would.
+# Tokenize ARGS into an array, honoring quotes the way the previous `eval`
+# did, but without evaluating any shell syntax.
 ARGS_ARRAY=()
 if [ -n "$ARGS" ]; then
+  if ! printf '%s' "$ARGS" | xargs -r true; then
+    echo "Error: could not parse 'args' (unmatched quote?)." >&2
+    exit 1
+  fi
   while IFS= read -r -d '' t; do ARGS_ARRAY+=("$t"); done \
-    < <(printf '%s' "$ARGS" | xargs printf '%s\0')
+    < <(printf '%s' "$ARGS" | xargs -r printf '%s\0')
 fi
 
 # Execute lychee
-lychee "${CHECKBOX_ARGS[@]}" "${FORMAT_ARGS[@]}" --output "${LYCHEE_TMP}" "${ARGS_ARRAY[@]}"
+lychee ${CHECKBOX_ARGS[@]+"${CHECKBOX_ARGS[@]}"} ${FORMAT_ARGS[@]+"${FORMAT_ARGS[@]}"} --output "${LYCHEE_TMP}" ${ARGS_ARRAY[@]+"${ARGS_ARRAY[@]}"}
 LYCHEE_EXIT_CODE=$?
 
 # If no links were found and `failIfEmpty` is set to `true` (and it is by default),

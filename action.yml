@@ -75,7 +75,8 @@ runs:
         # across composite steps. On some runners $HOME is overridden per step
         # (e.g. actions/checkout temporarily sets it), which made the PATH
         # entry from one step and the install in another step diverge.
-        echo "$RUNNER_TEMP/lychee/bin" >> "$GITHUB_PATH"
+        safe_bin_dir=$(printf '%s' "$RUNNER_TEMP/lychee/bin" | tr -d '\n\r')
+        printf '%s\n' "$safe_bin_dir" >> "$GITHUB_PATH"
         mkdir -p "$RUNNER_TEMP/lychee/bin"
       shell: bash
     - name: Download and extract lychee in temp directory
@@ -119,7 +120,8 @@ runs:
         fi
 
         # Output temp directory for use in later steps
-        echo "temp_dir=${TEMP_DIR}" >> $GITHUB_OUTPUT
+        safe_temp_dir=$(printf '%s' "$TEMP_DIR" | tr -d '\n\r')
+        echo "temp_dir=${safe_temp_dir}" >> "$GITHUB_OUTPUT"
       env:
         LYCHEE_VERSION: ${{ inputs.lycheeVersion }}
       shell: bash
@@ -133,8 +135,8 @@ runs:
     - name: Run Lychee
       id: run-lychee
       working-directory: ${{ inputs.workingDirectory }}
+      run: '"$GITHUB_ACTION_PATH/entrypoint.sh"'
       env:
-        ACTION_PATH: ${{ github.action_path }}
         # https://github.com/actions/runner/issues/665
         INPUT_TOKEN: ${{ inputs.TOKEN }}
         INPUT_ARGS: ${{ inputs.ARGS }}
@@ -146,7 +148,6 @@ runs:
         INPUT_CHECKBOX: ${{ inputs.CHECKBOX }}
         INPUT_OUTPUT: ${{ inputs.OUTPUT }}
         SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#summary-${{ job.check_run_id }}
-      run: "$ACTION_PATH/entrypoint.sh"
       shell: bash
 branding:
   icon: "external-link"

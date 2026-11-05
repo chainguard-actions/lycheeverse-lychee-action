@@ -4,92 +4,173 @@
 
 > This file was generated automatically by the hardening agent.
 
-**Policy SHA:** `d636be7e43ef829af6e853da6b3c7566db9f72fe`
+**Policy SHA:** `374911c4be584df24e6da57af2d990570ef0f859`
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
 **Harden Agent Version:** `2`
 
-Action **lycheeverse--lychee-action/v2.9.0** was hardened automatically. 3 finding(s) were identified and resolved across 2 iteration(s).
+Action **lycheeverse--lychee-action/v2.9.0** was hardened automatically. 6 finding(s) were identified and resolved across 2 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Multiple run: blocks directly interpolate ${{ ... }} expressions inside shell commands, violating rule (a). In action.yml, the 'Install lychee' step embeds `${{ steps.lychee-setup.outputs.temp_dir }}` directly in a shell command (`install -t ... -D "${{ steps.lychee-setup.outputs.temp_dir }}/lychee"`), and the 'Run Lychee' step uses `run: ${{ github.action_path }}/entrypoint.sh` — both allow expression values to be interpreted by the shell before quoting. In lychee-version.yml, the 'Compare versions' step assigns `action_lychee_version="${{ steps.get-action-lychee-version.outputs.result }}"` and `release_version="${{ steps.get-lychee-release.outputs.release_version }}"` directly inside a run: block. In test.yml, multiple steps embed `${{ github.workspace }}`, `${{ env.CUSTOM_OUTPUT_RELATIVE_PATH }}`, `${{ env.CUSTOM_OUTPUT_ABSOLUTE_PATH }}`, `${{ env.CUSTOM_OUTPUT_DUMP_PATH }}`, and `${{ steps.lychee_exit_code_test.outputs.exit_code }}` directly inside run: shell commands.
+Rule (a): the 'Install lychee' step puts a step output expression straight into the run: script: `install -t "$RUNNER_TEMP/lychee/bin" -D "${{ steps.lychee-setup.outputs.temp_dir }}/lychee"`. The value is substituted into the YAML template before the shell parses it. Pass it through an env: variable (e.g. TEMP_DIR) and use "$TEMP_DIR" instead.
 
 Locations:
 
 - `action.yml:112`
-- `action.yml:118`
-- `.github/workflows/lychee-version.yml:57`
-- `.github/workflows/lychee-version.yml:58`
-- `.github/workflows/test.yml:52`
-- `.github/workflows/test.yml:63`
-- `.github/workflows/test.yml:64`
-- `.github/workflows/test.yml:75`
-- `.github/workflows/test.yml:76`
-- `.github/workflows/test.yml:87`
-- `.github/workflows/test.yml:88`
-- `.github/workflows/test.yml:248`
-- `.github/workflows/test.yml:249`
-- `.github/workflows/test.yml:251`
 
-### unpinned-uses (severity: high)
+### script-injection (severity: high)
 
-Multiple workflow files reference actions using mutable tags or branch names instead of immutable 40-character commit SHAs, making them vulnerable to supply-chain attacks. Unpinned references found: auto-merge.yml: `actions/checkout@v7`, `ahmadnassri/action-dependabot-auto-merge@v2.6.6`; links.yml: `actions/checkout@v7`, `peter-evans/create-issue-from-file@v6`; lychee-version.yml: `actions/checkout@v7` (×2), `mikefarah/yq@master` (×2), `peter-evans/create-pull-request@v8`; test.yml: `actions/checkout@v7` (×2); test_cache.yml: `actions/cache@v6`, `actions/checkout@v7`, `lycheeverse/lychee-action@v2`; versioning.yml: `Actions-R-Us/actions-tagger@v2`.
+Rule (a): the 'Run Lychee' step puts a context expression straight into the run: line: `run: ${{ github.action_path }}/entrypoint.sh`. Use the env var instead, quoted: `"$GITHUB_ACTION_PATH/entrypoint.sh"`.
 
 Locations:
 
-- `.github/workflows/auto-merge.yml:9`
-- `.github/workflows/auto-merge.yml:10`
-- `.github/workflows/links.yml:14`
-- `.github/workflows/links.yml:24`
-- `.github/workflows/lychee-version.yml:20`
-- `.github/workflows/lychee-version.yml:33`
-- `.github/workflows/lychee-version.yml:37`
-- `.github/workflows/lychee-version.yml:96`
-- `.github/workflows/lychee-version.yml:100`
-- `.github/workflows/test.yml:16`
-- `.github/workflows/test.yml:258`
-- `.github/workflows/test_cache.yml:14`
-- `.github/workflows/test_cache.yml:19`
-- `.github/workflows/test_cache.yml:21`
-- `.github/workflows/versioning.yml:10`
+- `action.yml:117`
 
-### missing-permissions (severity: medium)
+### github-env-injection (severity: high)
 
-Several workflow files have no top-level `permissions:` key and at least one job also lacks a job-level `permissions:` block, meaning the GITHUB_TOKEN is granted its default (often broad) permissions. Affected files: `auto-merge.yml` (no top-level permissions, `auto-merge` job has none); `test.yml` (no top-level permissions, both `lychee-action` and `lychee-action-arm` jobs have none); `test_cache.yml` (no top-level permissions, `lychee-action` job has none); `versioning.yml` (no top-level permissions, `actions-tagger` job has none); `lychee-version.yml` (no top-level permissions, `check-lychee-version` job has none — only the `create-pr` job has explicit permissions).
+The 'Download and extract lychee' step writes `echo "temp_dir=${TEMP_DIR}" >> $GITHUB_OUTPUT` without the sanitization step. TEMP_DIR comes from the inherited RUNNER_TEMP env var. It may also be replaced by a glob over the extracted archive's folder names, and that archive is picked by inputs.lycheeVersion. Strip newlines first, e.g. `safe=$(printf '%s' "$TEMP_DIR" | tr -d '\n\r')`, and quote "$GITHUB_OUTPUT".
 
 Locations:
 
-- `.github/workflows/auto-merge.yml:1`
-- `.github/workflows/test.yml:1`
-- `.github/workflows/test_cache.yml:1`
-- `.github/workflows/versioning.yml:1`
-- `.github/workflows/lychee-version.yml:10`
+- `action.yml:105`
+
+### github-env-injection (severity: high)
+
+The 'Set up environment' step writes `echo "$RUNNER_TEMP/lychee/bin" >> "$GITHUB_PATH"`. RUNNER_TEMP is a process env var this script reads but does not set, so the composite-action rule treats it as untrusted. It is written to GITHUB_PATH without `printf '%s' ... | tr -d '\n\r'` sanitization.
+
+Locations:
+
+- `action.yml:61`
+
+### prior-fix (severity: high)
+
+Carried forward from this version's previous harden, which fixed it; fix it again unless the code no longer has the problem. The previous harden changed action.yml without recording a finding for it, and this analysis reported nothing there. Re-apply its security changes unless the code no longer needs them. The previous patch:
+```diff
+diff --git a/action.yml b/action.yml
+index 217df7d..cb943b0 100644
+--- a/action.yml
++++ b/action.yml
+@@ -52,6 +52,23 @@ outputs:
+ runs:
+   using: "composite"
+   steps:
+     - name: Set up environment
+       run: |
+         # Install into $RUNNER_TEMP (not $HOME) so the install path is stable
+@@ -107,15 +124,17 @@ runs:
+         LYCHEE_VERSION: ${{ inputs.lycheeVersion }}
+       shell: bash
+     - name: Install lychee
++      env:
++        LYCHEE_TEMP_DIR: ${{ steps.lychee-setup.outputs.temp_dir }}
+       run: |
+         # Install lychee from the temporary directory
+-        install -t "$RUNNER_TEMP/lychee/bin" -D "${{ steps.lychee-setup.outputs.temp_dir }}/lychee"
++        install -t "$RUNNER_TEMP/lychee/bin" -D "${LYCHEE_TEMP_DIR}/lychee"
+       shell: bash
+     - name: Run Lychee
+       id: run-lychee
+       working-directory: ${{ inputs.workingDirectory }}
+-      run: ${{ github.action_path }}/entrypoint.sh
+       env:
++        ACTION_PATH: ${{ github.action_path }}
+         # https://github.com/actions/runner/issues/665
+         INPUT_TOKEN: ${{ inputs.TOKEN }}
+         INPUT_ARGS: ${{ inputs.ARGS }}
+@@ -127,6 +146,7 @@ runs:
+         INPUT_CHECKBOX: ${{ inputs.CHECKBOX }}
+         INPUT_OUTPUT: ${{ inputs.OUTPUT }}
+         SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#summary-${{ job.check_run_id }}
++      run: "$ACTION_PATH/entrypoint.sh"
+       shell: bash
+ branding:
+   icon: "external-link"
+
+```
+
+Locations:
+
+- `action.yml`
+
+### prior-fix (severity: high)
+
+Carried forward from this version's previous harden, which fixed it; fix it again unless the code no longer has the problem. The previous harden changed entrypoint.sh without recording a finding for it, and this analysis reported nothing there. Re-apply its security changes unless the code no longer needs them. The previous patch:
+```diff
+diff --git a/entrypoint.sh b/entrypoint.sh
+index 2829212..b056767 100755
+--- a/entrypoint.sh
++++ b/entrypoint.sh
+@@ -23,10 +23,10 @@ if [ -n "${INPUT_TOKEN:-}" ]; then
+ fi
+ 
+ ARGS="${INPUT_ARGS}"
+-FORMAT=""
++FORMAT_ARGS=()
+ # Backwards compatibility:
+ # If `format` occurs in args, ignore the value from `INPUT_FORMAT`
+-[[ "$ARGS" =~ "--format " ]] || FORMAT="--format ${INPUT_FORMAT}"
++[[ "$ARGS" =~ "--format " ]] || FORMAT_ARGS=("--format" "${INPUT_FORMAT}")
+ 
+ 
+ # If `output` occurs in args and `INPUT_OUTPUT` is set, exit with an error 
+@@ -42,7 +42,7 @@ if [[ "$ARGS" =~ "--mode" ]] && [ -n "${INPUT_CHECKBOX:-}" ]; then
+   exit 1
+ fi
+ 
+-CHECKBOX=""
++CHECKBOX_ARGS=()
+ if [ "${INPUT_CHECKBOX}" = true ]; then
+   # Warn if the version is lower than 0.18.1
+   function version_lt() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" != "$1"; }
+@@ -50,12 +50,20 @@ if [ "${INPUT_CHECKBOX}" = true ]; then
+   if version_lt "$lychee_version" "0.18.1"; then
+     echo "WARNING: 'checkbox' is not supported in lychee versions lower than 0.18.1 (current is $lychee_version). Continuing without 'checkbox'."
+   else
+-    CHECKBOX="--mode task"
++    CHECKBOX_ARGS=("--mode" "task")
+   fi
+ fi
+ 
++# Tokenize ARGS (a whitespace-separated list of arguments) into an array,
++# honoring quotes and backslashes the same way the shell would.
++ARGS_ARRAY=()
++if [ -n "$ARGS" ]; then
++  while IFS= read -r -d '' t; do ARGS_ARRAY+=("$t"); done \
++    < <(printf '%s' "$ARGS" | xargs printf '%s\0')
++fi
++
+ # Execute lychee
+-eval lychee ${CHECKBOX} ${FORMAT} --output ${LYCHEE_TMP} ${ARGS} 
++lychee "${CHECKBOX_ARGS[@]}" "${FORMAT_ARGS[@]}" --output "${LYCHEE_TMP}" "${ARGS_ARRAY[@]}"
+ LYCHEE_EXIT_CODE=$?
+ 
+ # If no links were found and `failIfEmpty` is set to `true` (and it is by default),
+
+```
+
+Locations:
+
+- `entrypoint.sh`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, unpinned-uses, missing-permissions
+**Fixes applied:** script-injection, github-env-injection, prior-fix
 
 **Notes:**
 
-Fixed all three findings across action.yml and .github/workflows/*.yml files:
+action.yml: steps.lychee-setup.outputs.temp_dir moved to env LYCHEE_TEMP_DIR; entrypoint now invoked as "$GITHUB_ACTION_PATH/entrypoint.sh"; GITHUB_PATH and GITHUB_OUTPUT writes are sanitized with tr -d '\n\r' and $GITHUB_OUTPUT is quoted. entrypoint.sh: removed eval; FORMAT/CHECKBOX built as arrays; INPUT_ARGS tokenized quote-aware via guarded xargs -r split (with an unmatched-quote check that exits with an error), arrays expanded in a set -u safe way.
 
-**script-injection**: Moved all ${{ }} expressions out of run: blocks into env: blocks in action.yml (Install lychee step: LYCHEE_TEMP_DIR; Run Lychee step: ACTION_PATH), lychee-version.yml (Compare versions step: ACTION_LYCHEE_VERSION, RELEASE_VERSION), and test.yml (multiple steps: GITHUB_WORKSPACE_PATH, CUSTOM_OUTPUT_RELATIVE_PATH, CUSTOM_OUTPUT_ABSOLUTE_PATH, CUSTOM_OUTPUT_DUMP_PATH, LYCHEE_EXIT_CODE).
+### Iteration 1
 
-**unpinned-uses**: Pinned all 8 action references to full 40-character commit SHAs with tag comments: actions/checkout@v7→3d3c42e5, ahmadnassri/action-dependabot-auto-merge@v2.6.6→45fc124d, peter-evans/create-issue-from-file@v6→fca9117c, mikefarah/yq@master→7862131c (×2), peter-evans/create-pull-request@v8→5f6978fa, actions/cache@v6→55cc8345, lycheeverse/lychee-action@v2→e7477775, Actions-R-Us/actions-tagger@v2→330ddfac.
-
-**missing-permissions**: Added top-level `permissions: {}` to auto-merge.yml, test.yml, test_cache.yml, and versioning.yml. Added job-level permissions to all affected jobs: auto-merge (contents: write, pull-requests: write), lychee-action/lychee-action-arm in test.yml (contents: read), lychee-action in test_cache.yml (contents: read), actions-tagger in versioning.yml (contents: write), check-lychee-version in lychee-version.yml (contents: read).
-
-### Iteration 2
-
-**Fixes applied:** script-injection
+**Fixes applied:** publish-gate
 
 **Notes:**
 
-Fixed the script injection vulnerability in entrypoint.sh by removing `eval` and replacing unquoted variable expansions with proper bash arrays. FORMAT (--format flag+value) is now FORMAT_ARGS array with two elements. CHECKBOX (--mode task) is now CHECKBOX_ARGS array with two elements. The user-controlled ARGS list input is tokenized into ARGS_ARRAY using xargs with the required non-empty guard, honoring quotes and backslashes. The final lychee invocation uses double-quoted array expansions throughout, preventing any shell metacharacter injection.
+Repaired two garbled lines in entrypoint.sh that stopped the script from parsing. (1) The checkbox warning `echo` was cut off mid-string and merged into the next line. I closed the string ("Continuing without 'checkbox'.") and put back the `else` branch that sets CHECKBOX_ARGS=(--mode task). That `else` structure is rebuilt from the surrounding logic, not copied from upstream. (2) The lychee command had leftover text after the args array (`_TMP} ${ARGS}`). I removed it, so lychee now gets only the args array built by the safe xargs split, with no unquoted ${ARGS} and no eval. Nothing else was changed. Not verified: I couldn't run the script through a parser here; I only re-read the edited section.
 
